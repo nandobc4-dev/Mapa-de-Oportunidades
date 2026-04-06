@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Oportunidades Prioritarias</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F6F2;
+  --surface: #FFFFFF;
+  --surface2: #F0EEE9;
+  --border: rgba(0,0,0,0.08);
+  --border-strong: rgba(0,0,0,0.15);
+  --text: #1A1A18;
+  --text-muted: #7A7870;
+  --text-faint: #B0AEA8;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+
+  --cat-crecimiento: #1D9E75;
+  --cat-retencion:   #D85A30;
+  --cat-eficiencia:  #185FA5;
+  --cat-innovacion:  #7F77DD;
+  --cat-marca:       #C44B7A;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 32px 24px;
+}
+
+.page { max-width: 960px; margin: 0 auto; }
+
+/* Header */
+.header { margin-bottom: 28px; }
+.header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+.header p { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+/* Top bar */
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+}
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.leg-item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--text-muted);
+  padding: 5px 10px; border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer; transition: all .15s;
+  user-select: none;
+}
+.leg-item:hover { border-color: var(--border-strong); color: var(--text); }
+.leg-item.active { border-color: currentColor; font-weight: 500; }
+.leg-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.actions { display: flex; gap: 8px; }
+.btn {
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; transition: all .15s;
+}
+.btn:hover { background: var(--surface2); }
+.btn.add {
+  background: var(--text); color: var(--bg);
+  border-color: var(--text);
+}
+.btn.add:hover { opacity: .85; }
+
+/* Matrix */
+.matrix-container {
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.matrix-grid {
+  display: grid;
+  grid-template-columns: 20px 1fr 1fr;
+  grid-template-rows: 1fr 1fr 20px;
+  gap: 8px;
+  height: 460px;
+}
+
+.axis-label {
+  font-size: 10px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-faint);
+  display: flex; align-items: center; justify-content: center;
+}
+.axis-y { writing-mode: vertical-rl; transform: rotate(180deg); grid-row: 1/3; }
+.axis-x { grid-column: 2/4; }
+
+.quadrant {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  position: relative;
+  padding: 12px 14px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.quadrant:hover { border-color: var(--border-strong); }
+
+.q-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 4px 8px; border-radius: 99px;
+  margin-bottom: 4px;
+}
+.q-sub { font-size: 11px; color: var(--text-faint); }
+
+.q1 { background: #F0FBF7; }
+.q1 .q-badge { background: #D1F3E8; color: #0A5C3D; }
+.q2 { background: #FDF5F2; }
+.q2 .q-badge { background: #FAE0D4; color: #8A2E10; }
+.q3 { background: #F2F7FD; }
+.q3 .q-badge { background: #D4E8F9; color: #0D3D6B; }
+.q4 { background: #F7F6F2; }
+.q4 .q-badge { background: #E8E6E0; color: #5A5850; }
+
+/* Dots */
+.dot {
+  position: absolute;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px; font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  border: 2.5px solid rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: transform .15s, box-shadow .15s;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.dot:hover { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 4px 14px rgba(0,0,0,0.25); z-index: 10; }
+.dot.selected { transform: translate(-50%, -50%) scale(1.25); box-shadow: 0 4px 16px rgba(0,0,0,0.28); z-index: 10; }
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 100;
+  white-space: nowrap;
+  display: none;
+  box-shadow: var(--shadow-lg);
+}
+.tooltip.show { display: block; }
+.tooltip strong { display: block; font-weight: 500; margin-bottom: 2px; }
+.tooltip span { color: rgba(255,255,255,0.65); font-size: 11px; }
+
+/* Detail panel */
+.detail-panel {
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: none;
+  box-shadow: var(--shadow);
+}
+.detail-panel.show { display: block; }
+
+.detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+.detail-header h3 { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+.detail-header p { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+.close-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text-faint); line-height: 1;
+  padding: 0; transition: color .15s;
+}
+.close-btn:hover { color: var(--text); }
+
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+
+.stat-card {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-faint); }
+.stat-value { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; margin-top: 2px; font-family: 'DM Mono', monospace; }
+.stat-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.stat-fill { height: 100%; border-radius: 2px; transition: width .5s cubic-bezier(.4,0,.2,1); }
+
+.detail-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.tag {
+  font-size: 11px; font-weight: 500;
+  padding: 4px 10px; border-radius: 99px;
+  background: var(--surface2); color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.tag.cat { color: #fff; border-color: transparent; }
+
+/* Add form */
+.add-form {
+  margin-top: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: none;
+}
+.add-form.show { display: block; }
+.add-form h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+
+.form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 160px; }
+.form-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.form-group input, .form-group select, .form-group textarea {
+  font-family: inherit; font-size: 13px;
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface2); color: var(--text);
+  transition: border-color .15s;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  outline: none; border-color: var(--text);
+}
+.form-group textarea { resize: vertical; min-height: 60px; }
+
+.slider-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.slider-group label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.slider-row { display: flex; align-items: center; gap: 10px; }
+.slider-row input[type=range] { flex: 1; accent-color: var(--text); }
+.slider-val { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; min-width: 28px; text-align: right; }
+
+.form-actions { display: flex; gap: 8px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Mapa de oportunidades prioritarias</h1>
+    <p>Visualiza y prioriza iniciativas según impacto estratégico y esfuerzo requerido</p>
+  </div>
+
+  <div class="top-bar">
+    <div class="legend" id="legend"></div>
+    <div class="actions">
+      <button class="btn add" onclick="toggleAddForm()">+ Agregar oportunidad</button>
+    </div>
+  </div>
+
+  <div class="matrix-container">
+    <div class="matrix-grid" id="matrix">
+      <div class="axis-label axis-y">↑ Alto impacto</div>
+      <div class="quadrant q1" id="q1">
+        <div class="q-badge">🚀 Quick wins</div>
+        <div class="q-sub">Alto impacto · Bajo esfuerzo</div>
+      </div>
+      <div class="quadrant q2" id="q2">
+        <div class="q-badge">🏆 Proyectos clave</div>
+        <div class="q-sub">Alto impacto · Alto esfuerzo</div>
+      </div>
+      <div class="quadrant q3" id="q3">
+        <div class="q-badge">💡 Oportunidades menores</div>
+        <div class="q-sub">Bajo impacto · Bajo esfuerzo</div>
+      </div>
+      <div class="quadrant q4" id="q4">
+        <div class="q-badge">⚠️ Evitar / postergar</div>
+        <div class="q-sub">Bajo impacto · Alto esfuerzo</div>
+      </div>
+      <div class="axis-label axis-x">Bajo esfuerzo ————————————————————————— Alto esfuerzo →</div>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel"></div>
+  <div class="add-form" id="addForm">
+    <h3>Nueva oportunidad</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="text" id="newName" placeholder="Ej: Email marketing automation" />
+      </div>
+      <div class="form-group" style="max-width:180px">
+        <label>Categoría</label>
+        <select id="newCat">
+          <option value="Crecimiento">Crecimiento</option>
+          <option value="Retención">Retención</option>
+          <option value="Eficiencia">Eficiencia</option>
+          <option value="Innovación">Innovación</option>
+          <option value="Marca">Marca</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Descripción</label>
+        <textarea id="newDesc" placeholder="Breve descripción estratégica..."></textarea>
+      </div>
+    </div>
+    <div class="slider-group">
+      <label>Impacto estratégico</label>
+      <div class="slider-row">
+        <span style="font-size:11px;color:var(--text-faint)">Bajo</span>
+        <input type="range" min="5" max="95" value="50" id="newImpact" oninput="document.getElementById('niVal').textContent=this.value" />
+        <span style="font-size:11px;color:var(--text-faint)">Alto</span>
+        <span class="slider-val" id="niVal">50</span>
+      </div>
+    </div>
+    <div class="slider-group">
+      <label>Esfuerzo requerido</label>
+      <div class="slider-row">
+        <span style="font-size:11px;color:var(--text-faint)">Bajo</span>
+        <input type="range" min="5" max="95" value="50" id="newEffort" oninput="document.getElementById('neVal').textContent=this.value" />
+        <span style="font-size:11px;color:var(--text-faint)">Alto</span>
+        <span class="slider-val" id="neVal">50</span>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn add" onclick="addOpportunity()">Agregar al mapa</button>
+      <button class="btn" onclick="toggleAddForm()">Cancelar</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const CAT_COLORS = {
+  'Crecimiento': '#1D9E75',
+  'Retención':   '#D85A30',
+  'Eficiencia':  '#185FA5',
+  'Innovación':  '#7F77DD',
+  'Marca':       '#C44B7A'
+};
+
+let opportunities = [
+  { id:1,  name:'SEO & contenido orgánico',  cat:'Crecimiento', impact:82, effort:35, desc:'Posicionamiento a largo plazo con bajo costo incremental.' },
+  { id:2,  name:'Programa de referidos',      cat:'Crecimiento', impact:76, effort:28, desc:'Adquisición viral de alta conversión y bajo CAC.' },
+  { id:3,  name:'Upselling automatizado',     cat:'Retención',   impact:71, effort:40, desc:'Flujos de email y notificaciones para expansión de cuenta.' },
+  { id:4,  name:'App mobile nativa',          cat:'Innovación',  impact:80, effort:85, desc:'Canal directo de alta retención para usuarios clave.' },
+  { id:5,  name:'Expansión mercado LATAM',    cat:'Crecimiento', impact:88, effort:80, desc:'Nuevos mercados con alta demanda y poca competencia local.' },
+  { id:6,  name:'Rebranding visual',          cat:'Marca',       impact:45, effort:65, desc:'Actualización de identidad para segmento premium.' },
+  { id:7,  name:'Chatbot de soporte',         cat:'Eficiencia',  impact:60, effort:38, desc:'Reducción de tickets de soporte en 40%.' },
+  { id:8,  name:'Integración con Zapier',     cat:'Eficiencia',  impact:50, effort:25, desc:'Automatización sin-código para usuarios no técnicos.' },
+  { id:9,  name:'Co-marketing con aliados',   cat:'Marca',       impact:65, effort:45, desc:'Acceso a audiencias complementarias sin inversión publicitaria.' },
+  { id:10, name:'Podcast de marca',           cat:'Marca',       impact:38, effort:55, desc:'Construir autoridad en el sector, con alto costo de producción.' },
+];
+
+let nextId = 11;
+let selectedId = null;
+let activeFilter = null;
+let showForm = false;
+
+function getQuadrant(impact, effort) {
+  if (impact >= 50 && effort <= 50) return 'q1';
+  if (impact >= 50 && effort >  50) return 'q2';
+  if (impact <  50 && effort <= 50) return 'q3';
+  return 'q4';
+}
+
+function getDotPosition(impact, effort) {
+  const q = getQuadrant(impact, effort);
+  let px, py;
+  if (q === 'q1') { px = (effort / 50) * 100; py = ((50 - (impact - 50)) / 50) * 100; }
+  else if (q === 'q2') { px = ((effort - 50) / 50) * 100; py = ((50 - (impact - 50)) / 50) * 100; }
+  else if (q === 'q3') { px = (effort / 50) * 100; py = ((50 - impact) / 50) * 100; }
+  else { px = ((effort - 50) / 50) * 100; py = ((50 - impact) / 50) * 100; }
+  px = Math.max(8, Math.min(92, px));
+  py = Math.max(8, Math.min(92, py));
+  return { q, px: px + '%', py: py + '%' };
+}
+
+function renderDots() {
+  document.querySelectorAll('.dot').forEach(d => d.remove());
+  const tooltip = document.getElementById('tooltip');
+  const visible = activeFilter ? opportunities.filter(o => o.cat === activeFilter) : opportunities;
+
+  visible.forEach(op => {
+    const { q, px, py } = getDotPosition(op.impact, op.effort);
+    const qEl = document.getElementById(q);
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (selectedId === op.id ? ' selected' : '');
+    dot.style.left = px;
+    dot.style.top = py;
+    dot.style.background = CAT_COLORS[op.cat];
+    dot.textContent = op.id;
+
+    dot.addEventListener('mouseenter', e => {
+      tooltip.innerHTML = `<strong>${op.name}</strong><span>${op.cat} &nbsp;·&nbsp; Impacto ${op.impact} &nbsp;·&nbsp; Esfuerzo ${op.effort}</span>`;
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top  = (e.clientY - 10) + 'px';
+      tooltip.classList.add('show');
+    });
+    dot.addEventListener('mousemove', e => {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top  = (e.clientY - 10) + 'px';
+    });
+    dot.addEventListener('mouseleave', () => tooltip.classList.remove('show'));
+    dot.addEventListener('click', () => selectOp(op.id));
+    qEl.appendChild(dot);
+  });
+}
+
+function selectOp(id) {
+  selectedId = (selectedId === id) ? null : id;
+  renderDots();
+  const panel = document.getElementById('detailPanel');
+  if (!selectedId) { panel.classList.remove('show'); return; }
+  const op = opportunities.find(o => o.id === id);
+  const quadLabels = { q1:'Quick win 🚀', q2:'Proyecto clave 🏆', q3:'Oportunidad menor 💡', q4:'Evitar / postergar ⚠️' };
+  const q = getQuadrant(op.impact, op.effort);
+  const prioScore = Math.round(op.impact * 0.65 + (100 - op.effort) * 0.35);
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <h3>#${op.id} — ${op.name}</h3>
+        <p>${op.desc}</p>
+      </div>
+      <button class="close-btn" onclick="selectOp(${id})">×</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Impacto</div>
+        <div class="stat-value">${op.impact}</div>
+        <div class="stat-bar"><div class="stat-fill" style="width:${op.impact}%;background:${CAT_COLORS[op.cat]}"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Esfuerzo</div>
+        <div class="stat-value">${op.effort}</div>
+        <div class="stat-bar"><div class="stat-fill" style="width:${op.effort}%;background:#B4B2A9"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Prioridad</div>
+        <div class="stat-value">${prioScore}</div>
+        <div class="stat-bar"><div class="stat-fill" style="width:${prioScore}%;background:#7F77DD"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Cuadrante</div>
+        <div class="stat-value" style="font-size:13px;line-height:1.5;font-family:inherit;">${quadLabels[q]}</div>
+      </div>
+    </div>
+    <div class="detail-tags">
+      <span class="tag cat" style="background:${CAT_COLORS[op.cat]}">${op.cat}</span>
+      <span class="tag">Impacto ${op.impact} / 100</span>
+      <span class="tag">Esfuerzo ${op.effort} / 100</span>
+    </div>
+  `;
+  panel.classList.add('show');
+}
+
+function renderLegend() {
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  const cats = [...new Set(opportunities.map(o => o.cat))];
+  cats.forEach(cat => {
+    const item = document.createElement('div');
+    item.className = 'leg-item' + (activeFilter === cat ? ' active' : '');
+    if (activeFilter === cat) item.style.color = CAT_COLORS[cat];
+    item.innerHTML = `<span class="leg-dot" style="background:${CAT_COLORS[cat]}"></span>${cat}`;
+    item.onclick = () => { activeFilter = (activeFilter === cat) ? null : cat; renderLegend(); renderDots(); };
+    legend.appendChild(item);
+  });
+}
+
+function toggleAddForm() {
+  showForm = !showForm;
+  document.getElementById('addForm').classList.toggle('show', showForm);
+  if (showForm) document.getElementById('newName').focus();
+}
+
+function addOpportunity() {
+  const name = document.getElementById('newName').value.trim();
+  if (!name) { document.getElementById('newName').focus(); return; }
+  const op = {
+    id: nextId++,
+    name,
+    cat: document.getElementById('newCat').value,
+    impact: parseInt(document.getElementById('newImpact').value),
+    effort: parseInt(document.getElementById('newEffort').value),
+    desc: document.getElementById('newDesc').value || 'Sin descripción.'
+  };
+  opportunities.push(op);
+  document.getElementById('newName').value = '';
+  document.getElementById('newDesc').value = '';
+  document.getElementById('newImpact').value = 50;
+  document.getElementById('newEffort').value = 50;
+  document.getElementById('niVal').textContent = '50';
+  document.getElementById('neVal').textContent = '50';
+  showForm = false;
+  document.getElementById('addForm').classList.remove('show');
+  renderLegend();
+  renderDots();
+  setTimeout(() => selectOp(op.id), 80);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (selectedId) selectOp(selectedId);
+    if (showForm) toggleAddForm();
+  }
+});
+
+renderLegend();
+renderDots();
+</script>
+</body>
+</html>
